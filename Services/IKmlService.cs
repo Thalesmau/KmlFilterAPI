@@ -4,7 +4,6 @@ namespace KmlFilterAPI.Services;
 
 public interface IKmlService 
 {
-    Task<List<PlacemarkModel>> GetFilteredPlacemarksAsync(FiltersModel filters);
-    Task<List<string>> GetUniqueValuesAsync(string field);
-    Task<string> ExportKmlAsync(FiltersModel placemarks);
+    List<FiltersModel> GetFilteredPlacemarks(FiltersModel filters);
+    List<string> GetUniqueValues(string field);
 }

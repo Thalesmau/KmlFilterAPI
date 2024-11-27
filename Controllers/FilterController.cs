@@ -1,40 +1,114 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using KmlFilterAPI.Services;
+using KmlFilterAPI.Models;
+using KmlFilterAPI.Utils;
 
-namespace KmlFilterAPI.Controllers
+namespace KmlFilterAPI.Controllers;
+
+[ApiController]
+[Route("api/placemarks")]
+public class KmlController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class KmlController : ControllerBase
-    {
-        private readonly KmlHelper _kmlService;
+    private readonly IKmlService _kmlService;
 
-        public KmlController(KmlHelper kmlService)
+    public KmlController(IKmlService kmlService)
+    {
+        _kmlService = kmlService;
+    }
+
+    /// <summary>
+    /// Filtrar e exportar dados em formato KML.
+    /// </summary>
+    [HttpPost("export")]
+    public ActionResult ExportKml([FromBody] List<FiltersModel> filters)
+    {
+        if (filters == null || !filters.Any())
         {
-            _kmlService = kmlService;
+            return BadRequest("A lista de dados para exportação não pode estar vazia.");
         }
 
-        [HttpGet("filter")]
-        public IActionResult GetFilteredPlacemarks([FromQuery] string cliente, [FromQuery] string situacao, [FromQuery] string bairro, [FromQuery] string referencia, [FromQuery] string ruaCruzamento)
+        try
         {
-            var placemarks = _kmlService.GetFilteredPlacemarks(cliente, situacao, bairro, referencia, ruaCruzamento);
+            var elements = filters.Select(x => new FiltersModel
+            {
+                Cliente = x.Cliente ?? "",
+                Situacao = x.Situacao ?? "",
+                Bairro = x.Bairro ?? "",
+                Referencia = x.Referencia ?? "",
+                RuaCruzamento = x.RuaCruzamento ?? ""
+            }).ToList();
+
+            var kmlContent = KmlHelper.ExportToKml(filters);
+            
+            var fileName = $"filtered_{DateTime.UtcNow:yyyyMMddHHmmss}.kml";
+
+            return File(System.Text.Encoding.UTF8.GetBytes(kmlContent), "application/vnd.google-earth.kml+xml", fileName);
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Erro ao exportar o arquivo KML: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Listar os elementos filtrados no formato JSON.
+    /// </summary>
+    [HttpGet("placemarks")]
+    public ActionResult GetFilteredPlacemarks([FromQuery] FiltersModel filters)
+    {
+        if (!IsValidFilters(filters))
+        {
+            return BadRequest("Os filtros fornecidos são inválidos. Verifique e tente novamente.");
+        }
+
+        try
+        {
+            var placemarks = _kmlService.GetFilteredPlacemarks(filters);
             return Ok(placemarks);
         }
-
-        [HttpGet("unique-values/{field}")]
-        public IActionResult GetUniqueValues(string field)
+        catch (Exception ex)
         {
-            var values = _kmlService.GetUniqueValues(field);
-            return Ok(values);
+            return StatusCode(500, $"Erro ao listar os elementos: {ex.Message}");
         }
+    }
 
-        [HttpPost("export")]
-        public IActionResult ExportFilteredKml([FromBody] FilterRequest filterRequest)
+    /// <summary>
+    /// Obter valores únicos disponíveis para filtragem.
+    /// </summary>
+    [HttpGet("filters")]
+    public ActionResult GetUniqueValues()
+    {
+        try
         {
-            var placemarks = _kmlService.GetFilteredPlacemarks(filterRequest.Cliente, filterRequest.Situacao, filterRequest.Bairro, filterRequest.Referencia, filterRequest.RuaCruzamento);
-            _kmlService.ExportFilteredKml(placemarks, "filtered.kml");
-            return Ok();
+            var clientes = _kmlService.GetUniqueValues("CLIENTE");
+            var situacoes = _kmlService.GetUniqueValues("SITUAÇÃO");
+            var bairros = _kmlService.GetUniqueValues("BAIRRO");
+
+            return Ok(new
+            {
+                Clientes = clientes,
+                Situacoes = situacoes,
+                Bairros = bairros
+            });
         }
+        catch (Exception ex)
+        {
+            return StatusCode(500, $"Erro ao obter os filtros disponíveis: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// Valida os filtros fornecidos pelo cliente.
+    /// </summary>
+    private static bool IsValidFilters(FiltersModel filters)
+    {
+        if (!string.IsNullOrEmpty(filters.Referencia) && filters.Referencia.Length < 3)
+            return false;
+
+        if (!string.IsNullOrEmpty(filters.RuaCruzamento) && filters.RuaCruzamento.Length < 3)
+            return false;
+
+        return true;
     }
 
 }
