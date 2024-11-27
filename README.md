@@ -22,3 +22,18 @@ Uma API RESTful desenvolvida em **.NET** para manipulação e exportação de ar
    ```bash
    git clone https://github.com/seu-usuario/KmlFilterAPI.git
    cd KmlFilterAPI
+   ```
+2. Instale as dependências necessárias
+  ```bash
+  dotnet restore
+  ```
+
+3. Compile o projeto
+  ```bash
+  dotnet build
+  ```
+
+4. Inicie o servidor
+  ```bash
+  dotnet run
+  ``` 
